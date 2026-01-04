@@ -1,5 +1,10 @@
 // Normalize key names across different browsers
 export function normalizeKey(key: string): string {
+  // Handle empty or undefined keys
+  if (!key || key.length === 0) {
+    return key;
+  }
+
   // Handle common variations
   const keyMap: Record<string, string> = {
     'OS': 'Meta',        // Windows key on some browsers
@@ -11,9 +16,32 @@ export function normalizeKey(key: string): string {
     'Up': 'ArrowUp',
     'Down': 'ArrowDown',
     'Del': 'Delete',
+    'Backquote': '`',    // Backtick/grave key (physical key code)
   };
 
   return keyMap[key] || key;
+}
+
+// Get the character from a keyboard event, handling both key and code
+export function getKeyCharacter(event: KeyboardEvent): string {
+  // For most printable characters, event.key is the character
+  // But for some keys like backtick, we need to check both
+  const key = event.key;
+  
+  // If key is empty or 'Dead' (dead key), try to get from code
+  if (!key || key === 'Dead') {
+    // Map physical key codes to characters
+    const codeMap: Record<string, string> = {
+      'Backquote': event.shiftKey ? '~' : '`',
+    };
+    
+    if (event.code in codeMap) {
+      return codeMap[event.code];
+    }
+  }
+  
+  // Return the key as-is (it should be the character)
+  return key;
 }
 
 // Check if a key is a modifier key

@@ -38,12 +38,12 @@ export function calculateIPM(
   return Math.round(successfulItems / minutes);
 }
 
-// Calculate accuracy percentage
+// Calculate accuracy percentage (only counting items correct on first try)
 export function calculateAccuracy(results: TestResult[]): number {
   if (results.length === 0) return 0;
 
-  const successfulItems = results.filter(r => r.success).length;
-  return Math.round((successfulItems / results.length) * 100);
+  const firstTryCorrect = results.filter(r => r.correctOnFirstTry).length;
+  return Math.round((firstTryCorrect / results.length) * 100);
 }
 
 // Get breakdown by item type
@@ -64,7 +64,7 @@ export function getTypeBreakdown(
     const item = items.find(i => i.id === result.itemId);
     if (item) {
       breakdown[item.type].total++;
-      if (result.success) {
+      if (result.correctOnFirstTry) {
         breakdown[item.type].correct++;
       }
     }

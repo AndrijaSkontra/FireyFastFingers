@@ -13,6 +13,7 @@ export function TypingTest() {
     capsLockOn,
     startTest,
     resetTest,
+    skipItem,
   } = useTypingTest();
 
   const isTestComplete = testState.endTime !== null;
@@ -56,6 +57,14 @@ export function TypingTest() {
           isPaused={testState.isPaused}
           capsLockOn={capsLockOn}
         />
+
+        {/* Next button */}
+        <button
+          onClick={skipItem}
+          className="px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white text-base font-semibold rounded-lg transition-colors duration-200"
+        >
+          Next →
+        </button>
 
         {/* Helper text */}
         <div className="text-center text-sm text-gray-500">

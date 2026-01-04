@@ -13,6 +13,7 @@ export interface TestResult {
   success: boolean;
   timestamp: number;
   timeTaken: number;
+  correctOnFirstTry: boolean; // true if item was correct on the first attempt
 }
 
 export interface TestState {

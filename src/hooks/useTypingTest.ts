@@ -32,6 +32,8 @@ export function useTypingTest() {
   const modifierAloneRef = useRef<boolean>(false);
   const pauseStartTimeRef = useRef<number>(0);
   const totalPausedTimeRef = useRef<number>(0);
+  // Track attempts per item to determine if correct on first try
+  const itemAttemptsRef = useRef<Map<string, number>>(new Map());
 
   const currentItem = testState.items[testState.currentIndex];
 
@@ -50,6 +52,7 @@ export function useTypingTest() {
     setCurrentInput('');
     setFeedback(null);
     totalPausedTimeRef.current = 0;
+    itemAttemptsRef.current.clear();
   }, []);
 
   // Reset test
@@ -67,6 +70,7 @@ export function useTypingTest() {
     setFeedback(null);
     setPressedKeys(new Set());
     totalPausedTimeRef.current = 0;
+    itemAttemptsRef.current.clear();
   }, []);
 
   // Pause test
@@ -88,6 +92,13 @@ export function useTypingTest() {
 
   // Record result and move to next item (only if correct)
   const recordResult = useCallback((success: boolean) => {
+    if (!currentItem) return;
+
+    // Increment attempt count for this item
+    const currentAttempts = (itemAttemptsRef.current.get(currentItem.id) || 0) + 1;
+    itemAttemptsRef.current.set(currentItem.id, currentAttempts);
+    const isFirstTry = currentAttempts === 1;
+
     // Show feedback
     setFeedback(success ? 'correct' : 'incorrect');
     setTimeout(() => setFeedback(null), 300);
@@ -110,6 +121,7 @@ export function useTypingTest() {
       success: true,
       timestamp: Date.now(),
       timeTaken: Date.now() - itemStartTime,
+      correctOnFirstTry: isFirstTry,
     };
 
     setTestState(prev => {
@@ -140,6 +152,56 @@ export function useTypingTest() {
     modifierAloneRef.current = false;
   }, [testState, currentItem]);
 
+  // Skip current item
+  const skipItem = useCallback(() => {
+    if (!currentItem) return;
+
+    // Increment attempt count for this item
+    const currentAttempts = (itemAttemptsRef.current.get(currentItem.id) || 0) + 1;
+    itemAttemptsRef.current.set(currentItem.id, currentAttempts);
+
+    const itemStartTime = testState.results.length === 0 && testState.startTime
+      ? testState.startTime
+      : testState.results[testState.results.length - 1]?.timestamp || Date.now();
+
+    // Record as skipped (success: false, correctOnFirstTry: false)
+    const result: TestResult = {
+      itemId: currentItem.id,
+      success: false,
+      timestamp: Date.now(),
+      timeTaken: Date.now() - itemStartTime,
+      correctOnFirstTry: false,
+    };
+
+    setTestState(prev => {
+      const newResults = [...prev.results, result];
+      const newIndex = prev.currentIndex + 1;
+
+      // Check if test is complete
+      if (newIndex >= prev.items.length) {
+        return {
+          ...prev,
+          results: newResults,
+          currentIndex: newIndex,
+          endTime: Date.now(),
+          isActive: false,
+        };
+      }
+
+      return {
+        ...prev,
+        results: newResults,
+        currentIndex: newIndex,
+      };
+    });
+
+    // Reset input state
+    setCurrentInput('');
+    setPressedKeys(new Set());
+    modifierAloneRef.current = false;
+    setFeedback(null);
+  }, [testState, currentItem]);
+
   // Handle key down
   const handleKeyDown = useCallback((event: KeyboardEvent) => {
     // Check Caps Lock state
@@ -153,7 +215,16 @@ export function useTypingTest() {
 
     if (!testState.isActive || testState.isPaused || !currentItem) return;
 
-    const key = normalizeKey(event.key);
+    // Get the key character, handling edge cases like backtick/tilde
+    const rawKey = event.key || '';
+    let key: string;
+    
+    // For backtick/tilde, handle special cases
+    if (rawKey === 'Backquote' || event.code === 'Backquote') {
+      key = event.shiftKey ? '~' : '`';
+    } else {
+      key = normalizeKey(rawKey);
+    }
 
     // Add key to pressed keys set
     setPressedKeys(prev => new Set([...prev, key]));
@@ -287,6 +358,7 @@ export function useTypingTest() {
     capsLockOn,
     startTest,
     resetTest,
+    skipItem,
     pauseTest,
     resumeTest,
     totalPausedTime: totalPausedTimeRef.current,
