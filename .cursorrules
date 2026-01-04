@@ -1,0 +1,130 @@
+# FireyFastFingers - Cursor Rules
+
+## Project Overview
+This is a comprehensive typing tester application that tests all symbols on a keyboard, including:
+- Words (from a pool of ~400 common words)
+- Symbols (all keyboard symbols: `~!@#$%^&*()_+-=[]{}|;:'",.<>?/`)
+- Numbers (single digits and sequences)
+- Key combinations (Ctrl+A, Ctrl+C, Shift+Enter, etc.)
+- Modifier keys (Ctrl, Shift, Alt, Meta/Super)
+- Special keys (Enter, Esc, Tab, Backspace, Space, Arrow keys, Caps Lock)
+
+## Technology Stack
+- **Runtime**: Bun (use `bun` commands, not Node.js)
+- **Frontend**: React 19 with TypeScript
+- **Styling**: Tailwind CSS 4
+- **Server**: Bun.serve() with HTML imports (no Vite)
+- **Build**: Bun's built-in bundler
+
+## Bun-Specific Rules
+
+### Commands
+- Use `bun <file>` instead of `node <file>` or `ts-node <file>`
+- Use `bun test` instead of `jest` or `vitest`
+- Use `bun build <file.html|file.ts|file.css>` instead of `webpack` or `esbuild`
+- Use `bun install` instead of `npm install` or `yarn install` or `pnpm install`
+- Use `bun run <script>` instead of `npm run <script>`
+- Use `bunx <package> <command>` instead of `npx <package> <command>`
+- Bun automatically loads .env, so don't use dotenv
+
+### APIs
+- `Bun.serve()` supports WebSockets, HTTPS, and routes. Don't use `express`.
+- `bun:sqlite` for SQLite. Don't use `better-sqlite3`.
+- `Bun.redis` for Redis. Don't use `ioredis`.
+- `Bun.sql` for Postgres. Don't use `pg` or `postgres.js`.
+- `WebSocket` is built-in. Don't use `ws`.
+- Prefer `Bun.file` over `node:fs`'s readFile/writeFile
+- Bun.$`ls` instead of execa.
+
+### Frontend Development
+- Use HTML imports with `Bun.serve()`. Don't use `vite`.
+- HTML files can import .tsx, .jsx or .js files directly
+- `<link>` tags can point to stylesheets and Bun's CSS bundler will bundle
+- Run with `bun --hot ./src/index.ts` for hot reloading
+
+## Project Structure
+
+### Key Files
+- `src/index.ts` - Server entry point using Bun.serve()
+- `src/index.html` - HTML entry point
+- `src/frontend.tsx` - React app entry point
+- `src/App.tsx` - Main app component
+- `src/components/TypingTest.tsx` - Main typing test component
+- `src/hooks/useTypingTest.ts` - Core typing test logic hook
+- `src/data/testItemPools.ts` - Test data pools (words, symbols, combos, etc.)
+- `src/utils/testGenerator.ts` - Test item generation logic
+- `src/utils/keyboardUtils.ts` - Keyboard event handling utilities
+- `src/utils/platformUtils.ts` - Platform-specific utilities (Mac vs Windows key display)
+- `src/types/test.types.ts` - TypeScript type definitions
+
+### Test Configuration
+- Total items per test: 100
+- Distribution:
+  - 20% words
+  - 25% symbols
+  - 10% single numbers
+  - 10% number sequences
+  - 15% key combinations
+  - 10% standalone modifiers
+  - 10% special keys
+
+### Key Features
+- Real-time typing feedback (correct/incorrect)
+- Progress tracking with visual progress bar
+- Automatic pause on tab switch (visibility API)
+- Caps Lock detection and warning
+- Platform-aware key display (Cmd vs Ctrl)
+- Statistics tracking (WPM, IPM, accuracy, breakdown by type)
+- Prevents dangerous browser shortcuts during test
+
+### Component Architecture
+- `TypingTest` - Main container component
+- `TestControls` - Start test controls
+- `TestDisplay` - Current item display with feedback
+- `ProgressBar` - Visual progress indicator
+- `TestResults` - Results screen with statistics
+
+### State Management
+- Uses React hooks (useState, useEffect, useCallback, useRef)
+- Test state includes: items, currentIndex, startTime, endTime, results, isActive, isPaused
+- Keyboard event listeners managed via useEffect
+- Visibility change listener for pause/resume
+
+## Code Style Guidelines
+
+### TypeScript
+- Use strict mode (enabled in tsconfig.json)
+- Define types in `src/types/` directory
+- Use interfaces for object shapes
+- Prefer type unions for discriminated unions (e.g., TestItemType)
+
+### React
+- Use functional components with hooks
+- Extract reusable logic into custom hooks
+- Use useCallback for event handlers passed to children
+- Use useRef for values that don't trigger re-renders
+
+### Keyboard Handling
+- Normalize key names using `normalizeKey()` utility
+- Prevent default for dangerous shortcuts during active tests
+- Track pressed keys in a Set for combo validation
+- Handle keydown and keyup events separately
+- Validate modifiers on keyup for standalone modifier tests
+
+### Testing
+- Use `bun test` for running tests
+- Test files should use `import { test, expect } from "bun:test"`
+
+## Development Workflow
+1. Start dev server: `bun dev` (runs `bun --hot src/index.ts`)
+2. Server runs with HMR enabled in development
+3. Console logs from browser echo to server console
+4. Build for production: `bun run build`
+
+## Important Notes
+- The app prevents dangerous browser shortcuts (Ctrl+W, Ctrl+Q, etc.) during active tests
+- Key combinations are validated to ensure exact modifier matches
+- Standalone modifiers must be pressed and released alone (no other keys)
+- Tab switching automatically pauses the test
+- All keyboard symbols from US English keyboard layout are tested
+
