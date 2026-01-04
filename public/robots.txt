@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://fff.skontra.dev/sitemap.xml
+
