@@ -63,6 +63,14 @@ export const WORD_POOL = [
   'necessary', 'possible', 'available', 'national', 'political', 'support', 'community', 'information', 'education', 'position'
 ];
 
+// Coding-style word items with symbols (like const, function, =>, !=, etc.)
+export const CODING_WORD_POOL = [
+  'const', 'function', '=>', '!=', '===', '!==', '<=', '>=', '&&', '||',
+  '++', '--', '+=', '-=', '*=', '/=', '%=', '**', '??', '?.',
+  '()', '[]', '{}', '/*', '*/', '//', '`', '${',
+  '==', '!', '?', ':', ';', ',', '.', '...', '->',
+];
+
 // Symbol pool - ALL symbols on US English keyboard
 export const SYMBOL_POOL = [
   // Backtick row symbols
@@ -142,6 +150,12 @@ export const COMBO_POOL: KeyCombo[] = [
   // Shift combinations
   { display: 'Shift+Enter', keys: ['Shift', 'Enter'], modifiers: { shift: true }, mainKey: 'Enter' },
   { display: 'Shift+Tab', keys: ['Shift', 'Tab'], modifiers: { shift: true }, mainKey: 'Tab' },
+
+  // Mac-specific Command combinations (will be filtered by platform)
+  { display: 'Cmd+A', keys: ['Meta', 'a'], modifiers: { meta: true }, mainKey: 'a' },
+  { display: 'Cmd+C', keys: ['Meta', 'c'], modifiers: { meta: true }, mainKey: 'c' },
+  { display: 'Cmd+V', keys: ['Meta', 'v'], modifiers: { meta: true }, mainKey: 'v' },
+  { display: 'Cmd+X', keys: ['Meta', 'x'], modifiers: { meta: true }, mainKey: 'x' },
 ];
 
 // Special keys pool (for standalone key testing)

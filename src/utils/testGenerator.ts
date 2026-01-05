@@ -1,5 +1,6 @@
 import { TestItem } from '../types/test.types';
-import { WORD_POOL, SYMBOL_POOL, NUMBER_POOL, COMBO_POOL, MODIFIER_POOL, SPECIAL_KEYS_POOL } from '../data/testItemPools';
+import { WORD_POOL, SYMBOL_POOL, NUMBER_POOL, COMBO_POOL, MODIFIER_POOL, SPECIAL_KEYS_POOL, CODING_WORD_POOL } from '../data/testItemPools';
+import { isMacOS } from './platformUtils';
 
 // Shuffle array using Fisher-Yates algorithm
 function shuffleArray<T>(array: T[]): T[] {
@@ -29,23 +30,36 @@ function generateNumberSequence(): string {
 // Generate test items with balanced distribution
 export function generateTestItems(totalItems: number = 100): TestItem[] {
   const distribution = {
-    word: Math.floor(totalItems * 0.2),        // 20% words
+    word: Math.floor(totalItems * 0.1),        // 10% words (reduced from 20%)
+    codingWord: 2,                              // 2 coding-style word items
     symbol: Math.floor(totalItems * 0.25),     // 25% symbols
     number: Math.floor(totalItems * 0.1),      // 10% single numbers
-    numberSequence: Math.floor(totalItems * 0.1), // 10% number sequences (NEW)
-    combo: Math.floor(totalItems * 0.15),      // 15% key combinations
+    numberSequence: Math.floor(totalItems * 0.1), // 10% number sequences
+    combo: Math.floor(totalItems * 0.28),      // 28% key combinations (increased from 15%)
     modifier: Math.floor(totalItems * 0.1),    // 10% standalone modifiers
-    specialKey: Math.floor(totalItems * 0.1),  // 10% special keys (Enter, Esc, Tab, etc.)
+    specialKey: Math.floor(totalItems * 0.07),  // 7% special keys (reduced from 10%)
   };
 
   // Adjust to ensure we hit exactly totalItems
   const currentTotal = Object.values(distribution).reduce((a, b) => a + b, 0);
   if (currentTotal < totalItems) {
-    distribution.word += totalItems - currentTotal;
+    distribution.combo += totalItems - currentTotal;
   }
 
   const items: TestItem[] = [];
   let idCounter = 0;
+  const isMac = isMacOS();
+
+  // Filter combos based on platform
+  const availableCombos = COMBO_POOL.filter(combo => {
+    // On Mac, prefer Mac combos but also include Ctrl combos
+    // On non-Mac, exclude Mac combos
+    if (isMac) {
+      return true; // Include all combos on Mac
+    } else {
+      return !combo.display.startsWith('Cmd+'); // Exclude Mac combos on non-Mac
+    }
+  });
 
   // Generate word items
   for (let i = 0; i < distribution.word; i++) {
@@ -55,6 +69,18 @@ export function generateTestItems(totalItems: number = 100): TestItem[] {
       type: 'word',
       display: word,
       expectedKeys: word.split(''),
+      requiresSimultaneous: false,
+    });
+  }
+
+  // Generate coding-style word items
+  for (let i = 0; i < distribution.codingWord; i++) {
+    const codingWord = getRandomItem(CODING_WORD_POOL);
+    items.push({
+      id: `item-${idCounter++}`,
+      type: 'word',
+      display: codingWord,
+      expectedKeys: codingWord.split(''),
       requiresSimultaneous: false,
     });
   }
@@ -96,8 +122,26 @@ export function generateTestItems(totalItems: number = 100): TestItem[] {
   }
 
   // Generate key combination items
+  // On Mac, prioritize Mac combos (Cmd+C, Cmd+V, Cmd+X, Cmd+A, Shift+Enter)
+  const macCombos = availableCombos.filter(c => 
+    c.display.startsWith('Cmd+') || c.display === 'Shift+Enter'
+  );
+  const otherCombos = availableCombos.filter(c => 
+    !c.display.startsWith('Cmd+') && c.display !== 'Shift+Enter'
+  );
+
   for (let i = 0; i < distribution.combo; i++) {
-    const combo = getRandomItem(COMBO_POOL);
+    let combo: typeof COMBO_POOL[0];
+    
+    // On Mac, 60% chance to pick Mac combo, 40% chance for other combos
+    if (isMac && macCombos.length > 0 && Math.random() < 0.6) {
+      combo = getRandomItem(macCombos);
+    } else if (otherCombos.length > 0) {
+      combo = getRandomItem(otherCombos);
+    } else {
+      combo = getRandomItem(availableCombos);
+    }
+
     items.push({
       id: `item-${idCounter++}`,
       type: 'combo',
