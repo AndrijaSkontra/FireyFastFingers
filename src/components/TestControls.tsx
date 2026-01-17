@@ -20,6 +20,26 @@ export function TestControls({ onStart }: TestControlsProps) {
         </p>
       </div>
 
+      {/* Changelog */}
+      <div className="bg-gradient-to-br from-green-900/20 to-emerald-900/20 rounded-xl p-6 border border-green-700/50">
+        <div className="flex items-start gap-3">
+          <div className="text-2xl">✨</div>
+          <div>
+            <h3 className="text-lg font-bold text-green-400 mb-2">Latest Updates</h3>
+            <div className="space-y-2 text-sm">
+              <div className="flex items-start gap-2">
+                <span className="text-green-500 font-bold">NEW:</span>
+                <span className="text-gray-300">Real-time input display - see exactly what you're typing below the target text</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="text-green-500 font-bold">NEW:</span>
+                <span className="text-gray-300">Backspace to correct - wrong characters are blocked until you delete them</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Features */}
       <div className="bg-gray-800/50 rounded-xl p-8 border border-gray-700 space-y-6">
         <h2 className="text-2xl font-bold text-center mb-6">What You'll Type</h2>

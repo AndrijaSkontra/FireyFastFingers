@@ -91,7 +91,7 @@ export function useTypingTest() {
   }, [testState.isActive, testState.isPaused]);
 
   // Record result and move to next item (only if correct)
-  const recordResult = useCallback((success: boolean) => {
+  const recordResult = useCallback((success: boolean, clearInput: boolean = true) => {
     if (!currentItem) return;
 
     // Increment attempt count for this item
@@ -105,8 +105,10 @@ export function useTypingTest() {
 
     // Only proceed if correct
     if (!success) {
-      // Reset input state but don't advance
-      setCurrentInput('');
+      // Reset input state but don't advance (optionally keep input for visual feedback)
+      if (clearInput) {
+        setCurrentInput('');
+      }
       setPressedKeys(new Set());
       modifierAloneRef.current = false;
       return;
@@ -231,40 +233,56 @@ export function useTypingTest() {
 
     // Handle different item types
     if (currentItem.type === 'word' || currentItem.type === 'numberSequence') {
-      // For words and number sequences, accumulate characters
+      // Handle backspace key
+      if (key === 'Backspace') {
+        setCurrentInput(prev => prev.slice(0, -1));
+        return;
+      }
+
+      // For words and number sequences, accumulate characters (including wrong ones)
       if (key.length === 1 && !isModifierKey(key)) {
         setCurrentInput(prev => {
           const newInput = prev + key;
 
-          // Check if input is complete
-          if (newInput === currentItem.display) {
+          // Check if input is complete and correct
+          if (newInput === currentItem.display && currentItem.display.startsWith(prev + key)) {
             recordResult(true);
             return '';
           }
 
-          // Check if input is still on track
-          if (!currentItem.display.startsWith(newInput)) {
-            recordResult(false);
-            return '';
-          }
-
+          // Allow any character to be added so user can see their mistakes
           return newInput;
         });
       }
     } else if (currentItem.type === 'symbol' || currentItem.type === 'number') {
-      // For symbols and numbers, validate single key
+      // Handle backspace key
+      if (key === 'Backspace') {
+        setCurrentInput('');
+        return;
+      }
+
+      // For symbols and numbers, show what was typed
       if (key.length === 1 && !isModifierKey(key)) {
+        setCurrentInput(key);
         const success = validateRegularKey(key, currentItem.expectedKeys[0]);
-        recordResult(success);
+        if (success) {
+          // Correct input - advance to next item
+          setTimeout(() => recordResult(true), 100); // Small delay to show feedback
+        }
+        // If wrong, keep the input visible so user can see their mistake
       }
     } else if (currentItem.type === 'combo') {
       // For key combinations, validate the combo
       const success = validateCombo(event, currentItem.expectedKeys);
       if (success) {
-        recordResult(true);
+        // Show the successful combo briefly before advancing
+        const comboDisplay = Array.from(pressedKeys).concat(key).join('+');
+        setCurrentInput(comboDisplay);
+        setTimeout(() => recordResult(true), 100);
       } else if (!isModifierKey(key)) {
-        // Only fail if a non-modifier key was pressed wrong
-        recordResult(false);
+        // Show the wrong combo attempt (user can immediately retry, no backspace needed)
+        const comboDisplay = Array.from(pressedKeys).concat(key).join('+');
+        setCurrentInput(comboDisplay);
       }
     } else if (currentItem.type === 'modifier') {
       // For standalone modifiers and special keys

@@ -108,13 +108,93 @@ export function TestDisplay({ item, currentInput, feedback, isPaused, capsLockOn
           <div className="text-6xl font-bold mb-4">
             {(item.type === 'word' || item.type === 'numberSequence') ? (
               <span>
-                <span className="text-green-400">{currentInput}</span>
-                <span>{item.display.slice(currentInput.length)}</span>
+                {(() => {
+                  // Split input into correct and incorrect portions
+                  let correctLength = 0;
+                  for (let i = 0; i < currentInput.length; i++) {
+                    if (currentInput[i] === item.display[i]) {
+                      correctLength++;
+                    } else {
+                      break;
+                    }
+                  }
+                  const correctPart = currentInput.slice(0, correctLength);
+                  const incorrectPart = currentInput.slice(correctLength);
+                  const remainingPart = item.display.slice(currentInput.length);
+
+                  return (
+                    <>
+                      <span className="text-green-400">{correctPart}</span>
+                      {incorrectPart && <span className="text-red-500 bg-red-500/20">{incorrectPart}</span>}
+                      <span>{remainingPart}</span>
+                    </>
+                  );
+                })()}
               </span>
             ) : (
               <span>{getPlatformComboDisplay(item.display)}</span>
             )}
           </div>
+
+          {/* Show typed input for all types except modifiers */}
+          {item.type !== 'modifier' && (
+            <div className="mt-6 pt-4 border-t border-gray-600">
+              <div className="text-xs text-gray-500 mb-2 uppercase tracking-wider">Your Input</div>
+              <div className="min-h-[2rem] text-2xl font-mono">
+                {currentInput ? (
+                  <>
+                    {(item.type === 'word' || item.type === 'numberSequence') ? (
+                      // For words and sequences, show character-by-character comparison
+                      (() => {
+                        let correctLength = 0;
+                        for (let i = 0; i < currentInput.length; i++) {
+                          if (currentInput[i] === item.display[i]) {
+                            correctLength++;
+                          } else {
+                            break;
+                          }
+                        }
+                        const correctPart = currentInput.slice(0, correctLength);
+                        const incorrectPart = currentInput.slice(correctLength);
+
+                        return (
+                          <>
+                            <span className="text-green-400">{correctPart}</span>
+                            {incorrectPart && (
+                              <span className="text-red-500 bg-red-500/20 px-1 rounded">
+                                {incorrectPart}
+                              </span>
+                            )}
+                          </>
+                        );
+                      })()
+                    ) : (
+                      // For symbols, numbers, and combos, show if correct or wrong
+                      (() => {
+                        const isCorrect = (item.type === 'symbol' || item.type === 'number')
+                          ? currentInput === item.expectedKeys[0]
+                          : false; // For combos, always show as red until correct (then it advances)
+                        return isCorrect ? (
+                          <span className="text-green-400">{currentInput}</span>
+                        ) : (
+                          <span className="text-red-500 bg-red-500/20 px-2 rounded">
+                            {currentInput}
+                          </span>
+                        );
+                      })()
+                    )}
+                  </>
+                ) : (
+                  <span className="text-gray-600 italic">
+                    {item.type === 'combo' ? 'Press the key combo...' :
+                     item.type === 'symbol' ? 'Type the symbol...' :
+                     item.type === 'number' ? 'Type the number...' :
+                     'Start typing...'}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Helper text for combos and modifiers */}
           {item.type === 'combo' && (
@@ -131,12 +211,22 @@ export function TestDisplay({ item, currentInput, feedback, isPaused, capsLockOn
           )}
           {item.type === 'word' && (
             <div className="text-sm text-gray-400 mt-2">
-              Type the word
+              Type the word (backspace to delete mistakes)
             </div>
           )}
           {item.type === 'numberSequence' && (
             <div className="text-sm text-gray-400 mt-2">
-              Type the number sequence
+              Type the number sequence (backspace to delete mistakes)
+            </div>
+          )}
+          {item.type === 'symbol' && (
+            <div className="text-sm text-gray-400 mt-2">
+              Type the symbol (backspace to retry)
+            </div>
+          )}
+          {item.type === 'number' && (
+            <div className="text-sm text-gray-400 mt-2">
+              Type the number (backspace to retry)
             </div>
           )}
         </div>
