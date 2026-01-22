@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { TestState, TestItem, TestResult } from '../types/test.types';
+import type { TestState, TestItem, TestResult, DistributionConfig } from '../types/test.types';
 import { generateTestItems } from '../utils/testGenerator';
 import {
   normalizeKey,
@@ -38,8 +38,8 @@ export function useTypingTest() {
   const currentItem = testState.items[testState.currentIndex];
 
   // Start test
-  const startTest = useCallback(() => {
-    const items = generateTestItems(TOTAL_ITEMS);
+  const startTest = useCallback((config?: DistributionConfig) => {
+    const items = generateTestItems(TOTAL_ITEMS, config);
     setTestState({
       items,
       currentIndex: 0,

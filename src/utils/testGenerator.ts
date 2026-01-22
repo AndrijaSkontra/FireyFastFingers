@@ -1,4 +1,5 @@
-import { TestItem } from '../types/test.types';
+import type { TestItem, DistributionConfig } from '../types/test.types';
+import { DEFAULT_DISTRIBUTION } from '../types/test.types';
 import { WORD_POOL, SYMBOL_POOL, NUMBER_POOL, COMBO_POOL, MODIFIER_POOL, SPECIAL_KEYS_POOL, CODING_WORD_POOL } from '../data/testItemPools';
 import { isMacOS } from './platformUtils';
 
@@ -28,22 +29,41 @@ function generateNumberSequence(): string {
 }
 
 // Generate test items with balanced distribution
-export function generateTestItems(totalItems: number = 100): TestItem[] {
+export function generateTestItems(
+  totalItems: number = 100,
+  config: DistributionConfig = DEFAULT_DISTRIBUTION
+): TestItem[] {
+  // Calculate item counts from config percentages
+  // Word percentage includes coding words (about 20% of word allocation)
+  const wordTotal = Math.floor(totalItems * config.word / 100);
+  const codingWordCount = Math.max(0, Math.floor(wordTotal * 0.2)); // 20% of words are coding words
+  const regularWordCount = wordTotal - codingWordCount;
+
   const distribution = {
-    word: Math.floor(totalItems * 0.1),        // 10% words (reduced from 20%)
-    codingWord: 2,                              // 2 coding-style word items
-    symbol: Math.floor(totalItems * 0.25),     // 25% symbols
-    number: Math.floor(totalItems * 0.1),      // 10% single numbers
-    numberSequence: Math.floor(totalItems * 0.1), // 10% number sequences
-    combo: Math.floor(totalItems * 0.28),      // 28% key combinations (increased from 15%)
-    modifier: Math.floor(totalItems * 0.1),    // 10% standalone modifiers
-    specialKey: Math.floor(totalItems * 0.07),  // 7% special keys (reduced from 10%)
+    word: regularWordCount,
+    codingWord: codingWordCount,
+    symbol: Math.floor(totalItems * config.symbol / 100),
+    number: Math.floor(totalItems * config.number / 100),
+    numberSequence: Math.floor(totalItems * config.numberSequence / 100),
+    combo: Math.floor(totalItems * config.combo / 100),
+    modifier: Math.floor(totalItems * config.modifier / 100),
+    specialKey: Math.floor(totalItems * config.specialKey / 100),
   };
 
-  // Adjust to ensure we hit exactly totalItems
+  // Adjust to ensure we hit exactly totalItems (add remainder to largest category)
   const currentTotal = Object.values(distribution).reduce((a, b) => a + b, 0);
   if (currentTotal < totalItems) {
-    distribution.combo += totalItems - currentTotal;
+    // Find the largest category (excluding codingWord since it's part of word)
+    const categories = ['word', 'symbol', 'number', 'numberSequence', 'combo', 'modifier', 'specialKey'] as const;
+    let maxCategory: keyof typeof distribution = 'combo';
+    let maxValue = 0;
+    for (const cat of categories) {
+      if (distribution[cat] > maxValue) {
+        maxValue = distribution[cat];
+        maxCategory = cat;
+      }
+    }
+    distribution[maxCategory] += totalItems - currentTotal;
   }
 
   const items: TestItem[] = [];

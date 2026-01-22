@@ -1,10 +1,15 @@
+import { useState } from 'react';
 import { useTypingTest } from '../hooks/useTypingTest';
 import { TestControls } from './TestControls';
 import { TestDisplay } from './TestDisplay';
 import { ProgressBar } from './ProgressBar';
 import { TestResults } from './TestResults';
+import type { DistributionConfig } from '../types/test.types';
+import { DEFAULT_DISTRIBUTION } from '../types/test.types';
 
 export function TypingTest() {
+  const [distribution, setDistribution] = useState<DistributionConfig>(DEFAULT_DISTRIBUTION);
+
   const {
     testState,
     currentItem,
@@ -16,6 +21,8 @@ export function TypingTest() {
     skipItem,
   } = useTypingTest();
 
+  const handleStart = () => startTest(distribution);
+
   const isTestComplete = testState.endTime !== null;
   const isTestActive = testState.isActive && !isTestComplete;
 
@@ -23,7 +30,11 @@ export function TypingTest() {
   if (!testState.isActive && !isTestComplete) {
     return (
       <div className="min-h-screen flex items-center justify-center p-8">
-        <TestControls onStart={startTest} />
+        <TestControls
+          onStart={handleStart}
+          distribution={distribution}
+          onDistributionChange={setDistribution}
+        />
       </div>
     );
   }

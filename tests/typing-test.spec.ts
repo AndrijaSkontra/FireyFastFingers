@@ -1,5 +1,117 @@
 import { test, expect } from '@playwright/test';
 
+test.describe('Distribution Customization', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByRole('heading', { name: 'Typing Master' })).toBeVisible();
+  });
+
+  test('should show distribution customization section', async ({ page }) => {
+    // Check that the distribution section is visible
+    await expect(page.getByText('Customize Distribution')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Reset to Defaults' })).toBeVisible();
+  });
+
+  test('should show all category sliders', async ({ page }) => {
+    // Check that all 7 category labels are visible
+    const categories = ['Words', 'Symbols', 'Numbers', 'Sequences', 'Key Combos', 'Modifiers', 'Special Keys'];
+    for (const category of categories) {
+      await expect(page.getByText(category, { exact: true }).first()).toBeVisible();
+    }
+  });
+
+  test('should show total percentage indicator', async ({ page }) => {
+    // Check that total shows 100% by default (valid)
+    await expect(page.getByText('Total:')).toBeVisible();
+    await expect(page.getByText('100%')).toBeVisible();
+  });
+
+  test('should update percentage when slider changes', async ({ page }) => {
+    // Find the Words slider and change its value
+    const wordSlider = page.locator('input[type="range"]').first();
+    await wordSlider.fill('20');
+
+    // The number input should reflect the change
+    const wordInput = page.locator('input[type="number"]').first();
+    await expect(wordInput).toHaveValue('20');
+  });
+
+  test('should update percentage when number input changes', async ({ page }) => {
+    // Find the Words number input and change its value
+    const wordInput = page.locator('input[type="number"]').first();
+    await wordInput.fill('25');
+
+    // The value should update
+    await expect(wordInput).toHaveValue('25');
+  });
+
+  test('should show invalid state when total is not 100', async ({ page }) => {
+    // Change a slider to make total != 100
+    const wordInput = page.locator('input[type="number"]').first();
+    await wordInput.fill('50'); // This will make total > 100
+
+    // Total should show the new value and be red
+    const totalText = page.locator('text=/Total:/').locator('..');
+    await expect(totalText).toContainText('%');
+
+    // Error message should appear
+    await expect(page.getByText('Total must equal 100%')).toBeVisible();
+  });
+
+  test('should disable start button when total is not 100', async ({ page }) => {
+    // Change a value to make total != 100
+    const wordInput = page.locator('input[type="number"]').first();
+    await wordInput.fill('50');
+
+    // Start button should be disabled
+    const startButton = page.getByRole('button', { name: 'Start Test' });
+    await expect(startButton).toBeDisabled();
+  });
+
+  test('should enable start button when total equals 100', async ({ page }) => {
+    // By default, total should be 100 and button enabled
+    const startButton = page.getByRole('button', { name: 'Start Test' });
+    await expect(startButton).toBeEnabled();
+  });
+
+  test('should reset to defaults when reset button clicked', async ({ page }) => {
+    // Change some values
+    const wordInput = page.locator('input[type="number"]').first();
+    await wordInput.fill('30');
+
+    // Click reset
+    await page.getByRole('button', { name: 'Reset to Defaults' }).click();
+
+    // Values should be back to defaults (12 for words)
+    await expect(wordInput).toHaveValue('12');
+  });
+
+  test('should start test with custom distribution', async ({ page }) => {
+    // Set a custom distribution (keep total at 100)
+    // Words: 20 (+8), Symbols: 17 (-8) to keep total at 100
+    const wordInput = page.locator('input[type="number"]').first();
+    const symbolInput = page.locator('input[type="number"]').nth(1);
+
+    await wordInput.fill('20');
+    await symbolInput.fill('17');
+
+    // Verify total is still 100
+    await expect(page.getByText('100%')).toBeVisible();
+
+    // Start button should be enabled
+    const startButton = page.getByRole('button', { name: 'Start Test' });
+    await expect(startButton).toBeEnabled();
+
+    // Click start
+    await startButton.click();
+
+    // Test should start (progress bar or test display visible)
+    await page.waitForTimeout(500);
+    const testDisplay = page.locator('text=/Word|Symbol|Number|Key Combo|Modifier Key|Special Key/').first();
+    await expect(testDisplay).toBeVisible({ timeout: 5000 });
+  });
+});
+
 test.describe('Typing Test Features', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');

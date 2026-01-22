@@ -1,5 +1,25 @@
 export type TestItemType = 'word' | 'symbol' | 'number' | 'numberSequence' | 'combo' | 'modifier';
 
+export interface DistributionConfig {
+  word: number;           // Percentage for words (includes coding words)
+  symbol: number;         // Percentage for symbols
+  number: number;         // Percentage for single numbers
+  numberSequence: number; // Percentage for number sequences
+  combo: number;          // Percentage for key combos
+  modifier: number;       // Percentage for standalone modifiers
+  specialKey: number;     // Percentage for special keys
+}
+
+export const DEFAULT_DISTRIBUTION: DistributionConfig = {
+  word: 12,           // 10% regular + 2% coding words
+  symbol: 25,
+  number: 10,
+  numberSequence: 10,
+  combo: 28,
+  modifier: 10,
+  specialKey: 5,
+};
+
 export interface TestItem {
   id: string;
   type: TestItemType;

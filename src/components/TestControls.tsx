@@ -1,12 +1,49 @@
-import { getPlatformKeyName, isMacOS } from '../utils/platformUtils';
+import { getPlatformKeyName } from '../utils/platformUtils';
+import type { DistributionConfig } from '../types/test.types';
+import { DEFAULT_DISTRIBUTION } from '../types/test.types';
 
 interface TestControlsProps {
   onStart: () => void;
+  distribution: DistributionConfig;
+  onDistributionChange: (config: DistributionConfig) => void;
 }
 
-export function TestControls({ onStart }: TestControlsProps) {
+// Category configuration for UI rendering
+const CATEGORIES: Array<{
+  key: keyof DistributionConfig;
+  label: string;
+  description: string;
+  color: string;
+}> = [
+  { key: 'word', label: 'Words', description: 'Common English words', color: 'bg-blue-500' },
+  { key: 'symbol', label: 'Symbols', description: '@#$%^&* and more', color: 'bg-purple-500' },
+  { key: 'number', label: 'Numbers', description: 'Single digits 0-9', color: 'bg-green-500' },
+  { key: 'numberSequence', label: 'Sequences', description: '4-8 digit sequences', color: 'bg-emerald-500' },
+  { key: 'combo', label: 'Key Combos', description: 'Ctrl+A, Shift+Enter', color: 'bg-orange-500' },
+  { key: 'modifier', label: 'Modifiers', description: 'Ctrl, Shift, Alt alone', color: 'bg-pink-500' },
+  { key: 'specialKey', label: 'Special Keys', description: 'Enter, Tab, Arrows', color: 'bg-cyan-500' },
+];
+
+export function TestControls({ onStart, distribution, onDistributionChange }: TestControlsProps) {
   const superKeyName = getPlatformKeyName('Meta');
   const altKeyName = getPlatformKeyName('Alt');
+
+  // Calculate total percentage
+  const total = Object.values(distribution).reduce((sum, val) => sum + val, 0);
+  const isValid = total === 100;
+
+  // Handle individual category change
+  const handleCategoryChange = (key: keyof DistributionConfig, value: number) => {
+    onDistributionChange({
+      ...distribution,
+      [key]: Math.max(0, Math.min(100, value)),
+    });
+  };
+
+  // Reset to defaults
+  const handleReset = () => {
+    onDistributionChange(DEFAULT_DISTRIBUTION);
+  };
 
   return (
     <div className="max-w-3xl mx-auto space-y-8">
@@ -107,6 +144,62 @@ export function TestControls({ onStart }: TestControlsProps) {
         </div>
       </div>
 
+      {/* Distribution Customization */}
+      <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700 space-y-4">
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-lg font-bold">Customize Distribution</h2>
+          <button
+            onClick={handleReset}
+            className="text-sm text-gray-400 hover:text-white transition-colors"
+          >
+            Reset to Defaults
+          </button>
+        </div>
+
+        {/* Distribution sliders */}
+        <div className="space-y-3">
+          {CATEGORIES.map(({ key, label, description, color }) => (
+            <div key={key} className="flex items-center gap-3">
+              <div className={`w-3 h-3 rounded-full ${color} flex-shrink-0`} />
+              <div className="w-24 flex-shrink-0">
+                <div className="font-medium text-sm">{label}</div>
+                <div className="text-xs text-gray-500">{description}</div>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={distribution[key]}
+                onChange={(e) => handleCategoryChange(key, parseInt(e.target.value, 10))}
+                className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+              />
+              <div className="flex items-center gap-1 w-16 flex-shrink-0">
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={distribution[key]}
+                  onChange={(e) => handleCategoryChange(key, parseInt(e.target.value, 10) || 0)}
+                  className="w-12 px-2 py-1 text-sm text-center bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500"
+                />
+                <span className="text-gray-400 text-sm">%</span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Total indicator */}
+        <div className={`flex items-center justify-between pt-3 border-t border-gray-700 ${isValid ? 'text-green-400' : 'text-red-400'}`}>
+          <span className="font-medium">Total:</span>
+          <span className="font-bold">{total}%</span>
+        </div>
+        {!isValid && (
+          <div className="text-sm text-red-400 text-center">
+            Total must equal 100% to start the test
+          </div>
+        )}
+      </div>
+
       {/* Test Details */}
       <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700">
         <h2 className="text-lg font-bold mb-4 text-center">Test Details</h2>
@@ -123,9 +216,6 @@ export function TestControls({ onStart }: TestControlsProps) {
             <div className="text-3xl font-bold text-green-400">Live</div>
             <div className="text-sm text-gray-400">Real-Time Stats</div>
           </div>
-        </div>
-        <div className="mt-4 text-xs text-gray-500 text-center">
-          20% Words • 25% Symbols • 10% Numbers • 10% Sequences • 15% Combos • 10% Special Keys • 10% Modifiers
         </div>
       </div>
 
@@ -149,12 +239,17 @@ export function TestControls({ onStart }: TestControlsProps) {
       <div className="text-center pt-4">
         <button
           onClick={onStart}
-          className="px-12 py-5 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white text-xl font-bold rounded-xl transition-all duration-200 transform hover:scale-105"
+          disabled={!isValid}
+          className={`px-12 py-5 text-white text-xl font-bold rounded-xl transition-all duration-200 transform ${
+            isValid
+              ? 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 hover:scale-105'
+              : 'bg-gray-600 cursor-not-allowed'
+          }`}
         >
           Start Test
         </button>
         <p className="text-sm text-gray-500 mt-3">
-          Press any key to begin once the test starts
+          {isValid ? 'Press any key to begin once the test starts' : 'Adjust distribution to total 100%'}
         </p>
       </div>
     </div>
