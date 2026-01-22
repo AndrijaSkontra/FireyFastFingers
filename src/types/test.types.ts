@@ -26,6 +26,10 @@ export interface TestItem {
   display: string; // What to show user: "Ctrl+A", "@", "hello"
   expectedKeys: string[]; // For validation: ['Control', 'a'] or ['@']
   requiresSimultaneous: boolean; // true for combos/modifiers
+  // Repeat metadata (used for slow-item requeue)
+  originalItemId?: string; // id of the first instance
+  isRepeat?: boolean;
+  repeatCount?: number; // 1 for first repeat, 2 for second repeat, ...
 }
 
 export interface TestResult {

@@ -12,6 +12,36 @@ import {
 
 const TOTAL_ITEMS = 100;
 
+type PerformanceGroupKey =
+  | 'word'
+  | 'symbol'
+  | 'number'
+  | 'numberSequence'
+  | 'combo'
+  | 'modifierKey'
+  | 'specialKey';
+
+const MODIFIER_KEYS = new Set(['Control', 'Shift', 'Alt', 'Meta']);
+
+function getPerformanceGroupKey(item: TestItem): PerformanceGroupKey {
+  if (item.type !== 'modifier') return item.type;
+  const firstExpected = item.expectedKeys[0] ?? '';
+  return MODIFIER_KEYS.has(firstExpected) ? 'modifierKey' : 'specialKey';
+}
+
+function median(values: number[]): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+}
+
+function mad(values: number[], med: number): number {
+  if (values.length === 0) return 0;
+  const deviations = values.map(v => Math.abs(v - med));
+  return median(deviations);
+}
+
 export function useTypingTest() {
   const [testState, setTestState] = useState<TestState>({
     items: [],
@@ -34,8 +64,56 @@ export function useTypingTest() {
   const totalPausedTimeRef = useRef<number>(0);
   // Track attempts per item to determine if correct on first try
   const itemAttemptsRef = useRef<Map<string, number>>(new Map());
+  // Track timing for the currently displayed item (more accurate than using previous result timestamp)
+  const itemStartTimeRef = useRef<number>(0);
+  const itemPausedTimeRef = useRef<number>(0);
+  // Per-type rolling performance baseline (successful, non-outlier samples)
+  const performanceHistoryRef = useRef<Map<PerformanceGroupKey, number[]>>(new Map());
+  const repeatIdCounterRef = useRef<number>(0);
 
   const currentItem = testState.items[testState.currentIndex];
+
+  const isSlowTime = useCallback((item: TestItem, timeTakenMs: number) => {
+    const groupKey = getPerformanceGroupKey(item);
+    const history = performanceHistoryRef.current.get(groupKey) ?? [];
+
+    // Don't judge until we have a reasonable baseline.
+    const minSamples = 8;
+    if (history.length < minSamples) return { groupKey, slow: false, thresholdMs: null };
+
+    const med = median(history);
+    const madValue = mad(history, med);
+    const robustSigma = 1.4826 * madValue;
+
+    const k = 3;
+    const minSlowMs = 1500;
+    const thresholdMs =
+      robustSigma > 0
+        ? med + k * robustSigma
+        : Math.max(minSlowMs, med * 2); // guard when MAD=0
+
+    const slow = timeTakenMs > thresholdMs && timeTakenMs > minSlowMs;
+    return { groupKey, slow, thresholdMs };
+  }, []);
+
+  const maybeRecordBaselineSample = useCallback((item: TestItem, timeTakenMs: number, isSlow: boolean) => {
+    // Keep baseline representative: only record non-outlier successful samples.
+    if (isSlow) return;
+
+    const groupKey = getPerformanceGroupKey(item);
+    const history = performanceHistoryRef.current.get(groupKey) ?? [];
+    const next = [...history, timeTakenMs];
+    const windowSize = 30;
+    const clipped = next.length > windowSize ? next.slice(next.length - windowSize) : next;
+    performanceHistoryRef.current.set(groupKey, clipped);
+  }, []);
+
+  // Reset per-item timers whenever the current item changes / test starts
+  useEffect(() => {
+    if (!testState.isActive) return;
+    itemStartTimeRef.current = Date.now();
+    itemPausedTimeRef.current = 0;
+  }, [testState.isActive, testState.currentIndex]);
 
   // Start test
   const startTest = useCallback((config?: DistributionConfig) => {
@@ -53,6 +131,8 @@ export function useTypingTest() {
     setFeedback(null);
     totalPausedTimeRef.current = 0;
     itemAttemptsRef.current.clear();
+    itemStartTimeRef.current = Date.now();
+    itemPausedTimeRef.current = 0;
   }, []);
 
   // Reset test
@@ -71,6 +151,8 @@ export function useTypingTest() {
     setPressedKeys(new Set());
     totalPausedTimeRef.current = 0;
     itemAttemptsRef.current.clear();
+    itemStartTimeRef.current = 0;
+    itemPausedTimeRef.current = 0;
   }, []);
 
   // Pause test
@@ -86,6 +168,7 @@ export function useTypingTest() {
     if (testState.isActive && testState.isPaused) {
       const pausedDuration = Date.now() - pauseStartTimeRef.current;
       totalPausedTimeRef.current += pausedDuration;
+      itemPausedTimeRef.current += pausedDuration;
       setTestState(prev => ({ ...prev, isPaused: false }));
     }
   }, [testState.isActive, testState.isPaused]);
@@ -114,30 +197,59 @@ export function useTypingTest() {
       return;
     }
 
-    const itemStartTime = testState.results.length === 0 && testState.startTime
-      ? testState.startTime
-      : testState.results[testState.results.length - 1]?.timestamp || Date.now();
+    const timeTakenMs = Math.max(0, Date.now() - itemStartTimeRef.current - itemPausedTimeRef.current);
+    const slowEval = isSlowTime(currentItem, timeTakenMs);
 
+    // Keep baseline representative: record only non-outlier successful samples.
+    // (This applies to normal items and repeats.)
+    maybeRecordBaselineSample(currentItem, timeTakenMs, slowEval.slow);
+
+    const originalItemId = currentItem.originalItemId ?? currentItem.id;
+    const repeatCount = (currentItem.repeatCount ?? 0) + 1;
+    const shouldScheduleRepeat = slowEval.slow;
+
+    const now = Date.now();
     const result: TestResult = {
       itemId: currentItem.id,
       success: true,
-      timestamp: Date.now(),
-      timeTaken: Date.now() - itemStartTime,
+      timestamp: now,
+      timeTaken: timeTakenMs,
       correctOnFirstTry: isFirstTry,
     };
 
     setTestState(prev => {
       const newResults = [...prev.results, result];
       const newIndex = prev.currentIndex + 1;
+      let newItems = prev.items;
+
+      if (shouldScheduleRepeat) {
+        const repeatInstance: TestItem = {
+          ...currentItem,
+          id: `repeat-${originalItemId}-${repeatCount}-${repeatIdCounterRef.current++}`,
+          originalItemId,
+          isRepeat: true,
+          repeatCount,
+        };
+
+        // Insert after one intervening item: A -> B -> A-repeat.
+        // If we're at/near the end, insertion clamps to the end (no intervening item possible).
+        const insertIndex = Math.min(prev.currentIndex + 2, prev.items.length);
+        newItems = [
+          ...prev.items.slice(0, insertIndex),
+          repeatInstance,
+          ...prev.items.slice(insertIndex),
+        ];
+      }
 
       // Check if test is complete
-      if (newIndex >= prev.items.length) {
+      if (newIndex >= newItems.length) {
         return {
           ...prev,
           results: newResults,
           currentIndex: newIndex,
-          endTime: Date.now(),
+          endTime: now,
           isActive: false,
+          items: newItems,
         };
       }
 
@@ -145,6 +257,7 @@ export function useTypingTest() {
         ...prev,
         results: newResults,
         currentIndex: newIndex,
+        items: newItems,
       };
     });
 
@@ -152,7 +265,7 @@ export function useTypingTest() {
     setCurrentInput('');
     setPressedKeys(new Set());
     modifierAloneRef.current = false;
-  }, [testState, currentItem]);
+  }, [testState, currentItem, isSlowTime, maybeRecordBaselineSample]);
 
   // Skip current item
   const skipItem = useCallback(() => {
@@ -162,16 +275,12 @@ export function useTypingTest() {
     const currentAttempts = (itemAttemptsRef.current.get(currentItem.id) || 0) + 1;
     itemAttemptsRef.current.set(currentItem.id, currentAttempts);
 
-    const itemStartTime = testState.results.length === 0 && testState.startTime
-      ? testState.startTime
-      : testState.results[testState.results.length - 1]?.timestamp || Date.now();
-
     // Record as skipped (success: false, correctOnFirstTry: false)
     const result: TestResult = {
       itemId: currentItem.id,
       success: false,
       timestamp: Date.now(),
-      timeTaken: Date.now() - itemStartTime,
+      timeTaken: Math.max(0, Date.now() - itemStartTimeRef.current - itemPausedTimeRef.current),
       correctOnFirstTry: false,
     };
 
